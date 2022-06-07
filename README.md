@@ -19,7 +19,7 @@ Official GitHub: https://github.com/oreilly-japan/deep-learning-from-scratch-2
 * pipの場合
 
   ```sh
-  pip install git+https://github.com/Joichiro433/dl_scratch.git
+  pip install git+https://github.com/Joichiro433/dl_scratch2.git
   ```
 
 ## 感想

@@ -1,7 +1,4 @@
-# coding: utf-8
-import sys
-sys.path.append('..')
-from common.np import *
+from dl_scratch2.common.np import *
 
 
 class SGD:

@@ -1,5 +1,4 @@
-# coding: utf-8
-from common.config import GPU
+from dl_scratch2.common.config import GPU
 
 
 if GPU:

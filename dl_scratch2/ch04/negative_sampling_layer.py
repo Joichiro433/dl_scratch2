@@ -1,8 +1,5 @@
-# coding: utf-8
-import sys
-sys.path.append('..')
-from common.np import *  # import numpy as np
-from common.layers import Embedding, SigmoidWithLoss
+from dl_scratch2.common.np import *  # import numpy as np
+from dl_scratch2.common.layers import Embedding, SigmoidWithLoss
 import collections
 
 

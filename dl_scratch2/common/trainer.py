@@ -1,11 +1,13 @@
-# coding: utf-8
-import sys
-sys.path.append('..')
 import numpy
 import time
 import matplotlib.pyplot as plt
-from common.np import *  # import numpy as np
-from common.util import clip_grads
+import seaborn as sns
+from dl_scratch2.common.np import *  # import numpy as np
+from dl_scratch2.common.util import clip_grads
+
+
+sns.set_style('whitegrid')
+colors = ['#de3838', '#007bc3', '#ffd12a']
 
 
 class Trainer:

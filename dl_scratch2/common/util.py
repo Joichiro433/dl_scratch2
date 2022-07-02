@@ -1,29 +1,30 @@
-# coding: utf-8
-import sys
-sys.path.append('..')
-import os
-from common.np import *
+from typing import List, Dict, Tuple, Optional
+
+from nptyping import NDArray, Shape, Int, Float
+from rich import print
+
+from dl_scratch2.common.np import *
 
 
-def preprocess(text):
-    text = text.lower()
+def preprocess(text: str) -> Tuple[NDArray[Shape['*'], Int], Dict[str, int], Dict[int, str]]:
+    text : str = text.lower()
     text = text.replace('.', ' .')
-    words = text.split(' ')
+    words : List[str] = text.split(' ')
 
-    word_to_id = {}
-    id_to_word = {}
+    word_to_id : Dict[str, int] = {}
+    id_to_word : Dict[int, str] = {}
     for word in words:
         if word not in word_to_id:
             new_id = len(word_to_id)
             word_to_id[word] = new_id
             id_to_word[new_id] = word
 
-    corpus = np.array([word_to_id[w] for w in words])
+    corpus : NDArray[Shape['*'], Int] = np.array([word_to_id[w] for w in words])
 
     return corpus, word_to_id, id_to_word
 
 
-def cos_similarity(x, y, eps=1e-8):
+def cos_similarity(x: NDArray, y: NDArray, eps: float = 1e-8) -> float:
     '''コサイン類似度の算出
 
     :param x: ベクトル
@@ -31,12 +32,12 @@ def cos_similarity(x, y, eps=1e-8):
     :param eps: ”0割り”防止のための微小値
     :return:
     '''
-    nx = x / (np.sqrt(np.sum(x ** 2)) + eps)
-    ny = y / (np.sqrt(np.sum(y ** 2)) + eps)
-    return np.dot(nx, ny)
+    nx : NDArray = x / (np.sqrt(np.sum(x ** 2)) + eps)
+    ny : NDArray = y / (np.sqrt(np.sum(y ** 2)) + eps)
+    return nx @ ny
 
 
-def most_similar(query, word_to_id, id_to_word, word_matrix, top=5):
+def most_similar(query: str, word_to_id: Dict[str, int], id_to_word: Dict[int, str], word_matrix: NDArray[Shape['*, *'], Int], top: int = 5) -> None:
     '''類似単語の検索
 
     :param query: クエリ（テキスト）
@@ -50,16 +51,16 @@ def most_similar(query, word_to_id, id_to_word, word_matrix, top=5):
         return
 
     print('\n[query] ' + query)
-    query_id = word_to_id[query]
-    query_vec = word_matrix[query_id]
+    query_id : int = word_to_id[query]
+    query_vec : NDArray[Shape['*'], Int] = word_matrix[query_id]
 
-    vocab_size = len(id_to_word)
+    vocab_size : int = len(id_to_word)
 
-    similarity = np.zeros(vocab_size)
+    similarity : NDArray[Shape['*'], Float] = np.zeros(vocab_size)
     for i in range(vocab_size):
         similarity[i] = cos_similarity(word_matrix[i], query_vec)
 
-    count = 0
+    count : int = 0
     for i in (-1 * similarity).argsort():
         if id_to_word[i] == query:
             continue
@@ -70,14 +71,14 @@ def most_similar(query, word_to_id, id_to_word, word_matrix, top=5):
             return
 
 
-def convert_one_hot(corpus, vocab_size):
+def convert_one_hot(corpus: NDArray[Shape['*, ...'], Int], vocab_size: int) -> NDArray[Shape['*, ...'], Int]:
     '''one-hot表現への変換
 
     :param corpus: 単語IDのリスト（1次元もしくは2次元のNumPy配列）
     :param vocab_size: 語彙数
     :return: one-hot表現（2次元もしくは3次元のNumPy配列）
     '''
-    N = corpus.shape[0]
+    N : int = corpus.shape[0]
 
     if corpus.ndim == 1:
         one_hot = np.zeros((N, vocab_size), dtype=np.int32)
@@ -94,7 +95,7 @@ def convert_one_hot(corpus, vocab_size):
     return one_hot
 
 
-def create_co_matrix(corpus, vocab_size, window_size=1):
+def create_co_matrix(corpus: NDArray[Shape['*'], Int], vocab_size: int, window_size: int = 1) -> NDArray[Shape['*, *'], Int]:
     '''共起行列の作成
 
     :param corpus: コーパス（単語IDのリスト）
@@ -102,37 +103,37 @@ def create_co_matrix(corpus, vocab_size, window_size=1):
     :param window_size:ウィンドウサイズ（ウィンドウサイズが1のときは、単語の左右1単語がコンテキスト）
     :return: 共起行列
     '''
-    corpus_size = len(corpus)
-    co_matrix = np.zeros((vocab_size, vocab_size), dtype=np.int32)
+    corpus_size : int = len(corpus)
+    co_matrix : NDArray[Shape['*, *'], Int] = np.zeros((vocab_size, vocab_size), dtype=np.int32)
 
     for idx, word_id in enumerate(corpus):
         for i in range(1, window_size + 1):
-            left_idx = idx - i
-            right_idx = idx + i
+            left_idx : int = idx - i
+            right_idx : int = idx + i
 
             if left_idx >= 0:
-                left_word_id = corpus[left_idx]
+                left_word_id : int = corpus[left_idx]
                 co_matrix[word_id, left_word_id] += 1
 
             if right_idx < corpus_size:
-                right_word_id = corpus[right_idx]
+                right_word_id : int = corpus[right_idx]
                 co_matrix[word_id, right_word_id] += 1
 
     return co_matrix
 
 
-def ppmi(C, verbose=False, eps = 1e-8):
+def ppmi(C: NDArray[Shape['*, *'], Int], verbose: bool = False, eps: float = 1e-8) -> NDArray[Shape['*, *'], Float]:
     '''PPMI（正の相互情報量）の作成
 
     :param C: 共起行列
     :param verbose: 進行状況を出力するかどうか
     :return:
     '''
-    M = np.zeros_like(C, dtype=np.float32)
-    N = np.sum(C)
-    S = np.sum(C, axis=0)
-    total = C.shape[0] * C.shape[1]
-    cnt = 0
+    M : NDArray[Shape['*, *'], Float] = np.zeros_like(C, dtype=np.float32)
+    N : int = np.sum(C)
+    S : NDArray[Shape['*'], Int] = np.sum(C, axis=0)
+    total : int = C.shape[0] * C.shape[1]
+    cnt : int = 0
 
     for i in range(C.shape[0]):
         for j in range(C.shape[1]):
@@ -146,18 +147,18 @@ def ppmi(C, verbose=False, eps = 1e-8):
     return M
 
 
-def create_contexts_target(corpus, window_size=1):
+def create_contexts_target(corpus: NDArray[Shape['*'], Int], window_size: int = 1) -> Tuple[NDArray[Shape['*, *'], Int], NDArray[Shape['*'], Int]]:
     '''コンテキストとターゲットの作成
 
     :param corpus: コーパス（単語IDのリスト）
     :param window_size: ウィンドウサイズ（ウィンドウサイズが1のときは、単語の左右1単語がコンテキスト）
     :return:
     '''
-    target = corpus[window_size:-window_size]
-    contexts = []
+    target : NDArray[Shape['*'], Int] = corpus[window_size:-window_size]
+    contexts : List[List[int]] = []
 
     for idx in range(window_size, len(corpus)-window_size):
-        cs = []
+        cs : List[int] = []
         for t in range(-window_size, window_size + 1):
             if t == 0:
                 continue

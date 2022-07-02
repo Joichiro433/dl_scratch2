@@ -1,5 +1,4 @@
-# coding: utf-8
-from common.np import *
+from dl_scratch2.common.np import *
 
 
 def sigmoid(x):

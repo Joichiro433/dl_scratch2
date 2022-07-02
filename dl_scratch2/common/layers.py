@@ -1,30 +1,44 @@
-# coding: utf-8
-from common.np import *  # import numpy as np
-from common.config import GPU
-from common.functions import softmax, cross_entropy_error
+from typing import List, Optional
+from abc import ABCMeta, abstractmethod
+
+from nptyping import NDArray, Shape, Int, Float
+
+from dl_scratch2.common.np import *  # import numpy as np
+from dl_scratch2.common.config import GPU
+from dl_scratch2.common.functions import softmax, cross_entropy_error
 
 
-class MatMul:
-    def __init__(self, W):
-        self.params = [W]
-        self.grads = [np.zeros_like(W)]
-        self.x = None
+class Layer(metaclass=ABCMeta):
+    @abstractmethod
+    def forward(self):
+        raise NotImplementedError()
 
-    def forward(self, x):
+    @abstractmethod
+    def backward(self):
+        raise NotImplementedError()
+
+
+class MatMul(Layer):
+    def __init__(self, W: NDArray) -> None:
+        self.params : List[NDArray] = [W]
+        self.grads : List[NDArray] = [np.zeros_like(W)]
+        self.x : Optional[NDArray] = None
+
+    def forward(self, x: NDArray) -> NDArray:
         W, = self.params
-        out = np.dot(x, W)
+        out : NDArray = x @ W
         self.x = x
         return out
 
-    def backward(self, dout):
+    def backward(self, dout: NDArray) -> NDArray:
         W, = self.params
-        dx = np.dot(dout, W.T)
-        dW = np.dot(self.x.T, dout)
+        dx = dout @ W.T
+        dW = self.x.T @ dout
         self.grads[0][...] = dW
         return dx
 
 
-class Affine:
+class Affine(Layer):
     def __init__(self, W, b):
         self.params = [W, b]
         self.grads = [np.zeros_like(W), np.zeros_like(b)]
@@ -47,7 +61,7 @@ class Affine:
         return dx
 
 
-class Softmax:
+class Softmax(Layer):
     def __init__(self):
         self.params, self.grads = [], []
         self.out = None
@@ -63,7 +77,7 @@ class Softmax:
         return dx
 
 
-class SoftmaxWithLoss:
+class SoftmaxWithLoss(Layer):
     def __init__(self):
         self.params, self.grads = [], []
         self.y = None  # softmaxの出力
@@ -91,7 +105,7 @@ class SoftmaxWithLoss:
         return dx
 
 
-class Sigmoid:
+class Sigmoid(Layer):
     def __init__(self):
         self.params, self.grads = [], []
         self.out = None
@@ -106,7 +120,7 @@ class Sigmoid:
         return dx
 
 
-class SigmoidWithLoss:
+class SigmoidWithLoss(Layer):
     def __init__(self):
         self.params, self.grads = [], []
         self.loss = None
@@ -128,7 +142,7 @@ class SigmoidWithLoss:
         return dx
 
 
-class Dropout:
+class Dropout(Layer):
     '''
     http://arxiv.org/abs/1207.0580
     '''
@@ -148,19 +162,19 @@ class Dropout:
         return dout * self.mask
 
 
-class Embedding:
-    def __init__(self, W):
-        self.params = [W]
-        self.grads = [np.zeros_like(W)]
-        self.idx = None
+class Embedding(Layer):
+    def __init__(self, W: NDArray):
+        self.params : List[NDArray] = [W]
+        self.grads : List[NDArray] = [np.zeros_like(W)]
+        self.idx : Optional[List[int]] = None
 
-    def forward(self, idx):
+    def forward(self, idx: List[int]) -> NDArray:
         W, = self.params
         self.idx = idx
-        out = W[idx]
+        out : NDArray = W[idx]
         return out
 
-    def backward(self, dout):
+    def backward(self, dout: NDArray):
         dW, = self.grads
         dW[...] = 0
         if GPU:

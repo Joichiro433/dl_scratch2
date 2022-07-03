@@ -126,79 +126,91 @@ class TimeRNN(Layer):
         self.h = None
 
 
-class LSTM:
-    def __init__(self, Wx, Wh, b):
-        '''
-
+class LSTM(Layer):
+    def __init__(
+            self, 
+            Wx: NDArray[Shape['Input, Hidden_x_4'], Float], 
+            Wh: NDArray[Shape['Hidden, Hidden_x_4'], Float], 
+            b: NDArray[Shape['Hidden_x_4'], Float]) -> None:
+        """
         Parameters
         ----------
         Wx: 入力`x`用の重みパラーメタ（4つ分の重みをまとめる）
         Wh: 隠れ状態`h`用の重みパラメータ（4つ分の重みをまとめる）
         b: バイアス（4つ分のバイアスをまとめる）
-        '''
-        self.params = [Wx, Wh, b]
-        self.grads = [np.zeros_like(Wx), np.zeros_like(Wh), np.zeros_like(b)]
-        self.cache = None
+        """
+        self.params : List[NDArray] = [Wx, Wh, b]
+        self.grads : List[NDArray] = [np.zeros_like(Wx), np.zeros_like(Wh), np.zeros_like(b)]
+        self.cache : Optional[Tuple[NDArray, ...]] = None
 
-    def forward(self, x, h_prev, c_prev):
+    def forward(
+            self, 
+            x: NDArray[Shape['Batch, Input'], Float], 
+            h_prev: NDArray[Shape['Batch, Hidden'], Float], 
+            c_prev: NDArray[Shape['Batch, Hidden'], Float]
+        ) -> Tuple[NDArray[Shape['Batch, Hidden'], Float], NDArray[Shape['Batch, Hidden'], Float]]:
         Wx, Wh, b = self.params
         N, H = h_prev.shape
 
-        A = np.dot(x, Wx) + np.dot(h_prev, Wh) + b
+        A : NDArray[Shape['Batch, Hidden_x_4'], Float] = (x @ Wx) + (h_prev @ Wh) + b
 
-        f = A[:, :H]
-        g = A[:, H:2*H]
-        i = A[:, 2*H:3*H]
-        o = A[:, 3*H:]
+        f : NDArray[Shape['Batch, Hidden'], Float] = A[:, :H]
+        g : NDArray[Shape['Batch, Hidden'], Float] = A[:, H:2*H]
+        i : NDArray[Shape['Batch, Hidden'], Float] = A[:, 2*H:3*H]
+        o : NDArray[Shape['Batch, Hidden'], Float] = A[:, 3*H:]
 
-        f = sigmoid(f)
-        g = np.tanh(g)
-        i = sigmoid(i)
-        o = sigmoid(o)
+        f : NDArray[Shape['Batch, Hidden'], Float] = sigmoid(f)
+        g : NDArray[Shape['Batch, Hidden'], Float] = np.tanh(g)
+        i : NDArray[Shape['Batch, Hidden'], Float] = sigmoid(i)
+        o : NDArray[Shape['Batch, Hidden'], Float] = sigmoid(o)
 
-        c_next = f * c_prev + g * i
-        h_next = o * np.tanh(c_next)
+        c_next : NDArray[Shape['Batch, Hidden'], Float] = f * c_prev + g * i
+        h_next : NDArray[Shape['Batch, Hidden'], Float] = o * np.tanh(c_next)
 
         self.cache = (x, h_prev, c_prev, i, f, g, o, c_next)
         return h_next, c_next
 
-    def backward(self, dh_next, dc_next):
+    def backward(
+            self, 
+            dh_next: NDArray[Shape['Batch, Hidden'], Float], 
+            dc_next: NDArray[Shape['Batch, Hidden'], Float]
+        ) -> Tuple[NDArray[Shape['Batch, Input'], Float], NDArray[Shape['Batch, Hidden'], Float], NDArray[Shape['Batch, Hidden'], Float]]:
         Wx, Wh, b = self.params
         x, h_prev, c_prev, i, f, g, o, c_next = self.cache
 
-        tanh_c_next = np.tanh(c_next)
+        tanh_c_next : NDArray[Shape['Batch, Hidden'], Float] = np.tanh(c_next)
 
-        ds = dc_next + (dh_next * o) * (1 - tanh_c_next ** 2)
+        ds : NDArray[Shape['Batch, Hidden'], Float] = dc_next + (dh_next * o) * (1 - tanh_c_next ** 2)
 
-        dc_prev = ds * f
+        dc_prev : NDArray[Shape['Batch, Hidden'], Float] = ds * f
 
-        di = ds * g
-        df = ds * c_prev
-        do = dh_next * tanh_c_next
-        dg = ds * i
+        di : NDArray[Shape['Batch, Hidden'], Float] = ds * g
+        df : NDArray[Shape['Batch, Hidden'], Float] = ds * c_prev
+        do : NDArray[Shape['Batch, Hidden'], Float] = dh_next * tanh_c_next
+        dg : NDArray[Shape['Batch, Hidden'], Float] = ds * i
 
         di *= i * (1 - i)
         df *= f * (1 - f)
         do *= o * (1 - o)
         dg *= (1 - g ** 2)
 
-        dA = np.hstack((df, dg, di, do))
+        dA : NDArray[Shape['Batch, Hidden_x_4'], Float] = np.hstack((df, dg, di, do))
 
-        dWh = np.dot(h_prev.T, dA)
-        dWx = np.dot(x.T, dA)
-        db = dA.sum(axis=0)
+        dWh : NDArray[Shape['Hidden, Hidden_x_4'], Float] = h_prev.T @ dA
+        dWx : NDArray[Shape['Input, Hidden_x_4'], Float] = x.T @ dA
+        db : NDArray[Shape['Hidden_x_4'], Float] = dA.sum(axis=0)
 
         self.grads[0][...] = dWx
         self.grads[1][...] = dWh
         self.grads[2][...] = db
 
-        dx = np.dot(dA, Wx.T)
-        dh_prev = np.dot(dA, Wh.T)
+        dx : NDArray[Shape['Batch, Input'], Float] = dA @ Wx.T
+        dh_prev : NDArray[Shape['Batch, Hidden'], Float] = dA @ Wh.T
 
         return dx, dh_prev, dc_prev
 
 
-class TimeLSTM:
+class TimeLSTM(Layer):
     def __init__(self, Wx, Wh, b, stateful=False):
         self.params = [Wx, Wh, b]
         self.grads = [np.zeros_like(Wx), np.zeros_like(Wh), np.zeros_like(b)]

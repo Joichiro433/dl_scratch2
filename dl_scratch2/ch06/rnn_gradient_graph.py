@@ -1,22 +1,26 @@
-# coding: utf-8
 import numpy as np
+from nptyping import NDArray, Shape, Int, Float
 import matplotlib.pyplot as plt
+import seaborn as sns
+from rich import print
+
+sns.set_style('whitegrid')
 
 
 N = 2  # ミニバッチサイズ
 H = 3  # 隠れ状態ベクトルの次元数
 T = 20  # 時系列データの長さ
 
-dh = np.ones((N, H))
+dh : NDArray[Shape['Batch, Hidden'], Float] = np.ones((N, H))
 
 np.random.seed(3)
 
-Wh = np.random.randn(H, H)
+Wh : NDArray[Shape['Hidden, Hidden'], Float] = np.random.randn(H, H)
 #Wh = np.random.randn(H, H) * 0.5
 
 norm_list = []
 for t in range(T):
-    dh = np.dot(dh, Wh.T)
+    dh = dh @ Wh.T
     norm = np.sqrt(np.sum(dh**2)) / N
     norm_list.append(norm)
 

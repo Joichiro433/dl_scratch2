@@ -1,12 +1,15 @@
-# coding: utf-8
-import sys
-sys.path.append('..')
 import numpy as np
-from common.time_layers import *
+from nptyping import NDArray, Shape, Int, Float
+
+from dl_scratch2.common.time_layers import *
 
 
-class SimpleRnnlm:
-    def __init__(self, vocab_size, wordvec_size, hidden_size):
+class SimpleRnnlm(Layer):
+    def __init__(
+            self, 
+            vocab_size: int, 
+            wordvec_size: int, 
+            hidden_size: int) -> None:
         V, D, H = vocab_size, wordvec_size, hidden_size
         rn = np.random.randn
 

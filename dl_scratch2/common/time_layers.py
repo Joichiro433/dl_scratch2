@@ -8,29 +8,38 @@ from dl_scratch2.common.functions import softmax, sigmoid
 
 
 class RNN(Layer):
-    def __init__(self, Wx: NDArray[Shape['*, *'], Float], Wh: NDArray[Shape['*, *'], Float], b: NDArray[Shape['*'], Float]) -> None:
+    def __init__(
+            self, 
+            Wx: NDArray[Shape['Input, Hidden'], Float], 
+            Wh: NDArray[Shape['Hidden, Hidden'], Float], 
+            b: NDArray[Shape['Hidden'], Float]) -> None:
         self.params : List[NDArray] = [Wx, Wh, b]
         self.grads : List[NDArray] = [np.zeros_like(Wx), np.zeros_like(Wh), np.zeros_like(b)]
-        self.cache : Optional[Tuple[NDArray, NDArray, NDArray]] = None
+        self.cache : Optional[Tuple[NDArray, NDArray, NDArray]] = None  # 逆伝播の計算に使用
 
-    def forward(self, x: NDArray[Shape['*, *'], Float], h_prev: NDArray[Shape['*, *'], Float]) -> NDArray[Shape['*, *'], Float]:
+    def forward(
+            self, 
+            x: NDArray[Shape['Batch, Input'], Float], 
+            h_prev: NDArray[Shape['Batch, Hidden'], Float]) -> NDArray[Shape['Batch, Hidden'], Float]:
         Wx, Wh, b = self.params
-        t : NDArray[Shape['*, *'], Float] = (h_prev @ Wh) + (x @ Wx) + b
-        h_next : NDArray[Shape['*, *'], Float] = np.tanh(t)
+        t : NDArray[Shape['Batch, Hidden'], Float] = (h_prev @ Wh) + (x @ Wx) + b
+        h_next : NDArray[Shape['Batch, Hidden'], Float] = np.tanh(t)
 
         self.cache = (x, h_prev, h_next)
         return h_next
 
-    def backward(self, dh_next: NDArray[Shape['*, *'], Float]) -> Tuple[NDArray, NDArray]:
+    def backward(
+            self, 
+            dh_next: NDArray[Shape['Batch, Hidden'], Float]) -> Tuple[NDArray[Shape['Batch, Hidden'], Float], NDArray[Shape['Batch, Hidden'], Float]]:
         Wx, Wh, b = self.params
         x, h_prev, h_next = self.cache
 
-        dt : NDArray[Shape['*, *'], Float] = dh_next * (1 - h_next ** 2)
-        db : NDArray[Shape['*'], Float] = np.sum(dt, axis=0)
-        dWh : NDArray[Shape['*, *'], Float] = np.dot(h_prev.T, dt)
-        dh_prev : NDArray[Shape['*, *'], Float] = np.dot(dt, Wh.T)
-        dWx : NDArray[Shape['*, *'], Float] = np.dot(x.T, dt)
-        dx : NDArray[Shape['*, *'], Float] = np.dot(dt, Wx.T)
+        dt : NDArray[Shape['Batch, Hidden'], Float] = dh_next * (1 - h_next ** 2)
+        db : NDArray[Shape['Hidden'], Float] = np.sum(dt, axis=0)
+        dWh : NDArray[Shape['Hidden, Hidden'], Float] = h_prev.T @ dt
+        dh_prev : NDArray[Shape['Batch, Hidden'], Float] = dt @ Wh.T
+        dWx : NDArray[Shape['Input, Hidden'], Float] = x.T @ dt
+        dx : NDArray[Shape['Batch, Input'], Float] = dt @ Wx.T
 
         self.grads[0][...] = dWx
         self.grads[1][...] = dWh
@@ -40,16 +49,23 @@ class RNN(Layer):
 
 
 class TimeRNN(Layer):
-    def __init__(self, Wx : NDArray[Shape['*, *'], Float], Wh : NDArray[Shape['*, *'], Float], b : NDArray[Shape['*'], Float], stateful : bool = False) -> None:
+    def __init__(
+            self, 
+            Wx : NDArray[Shape['Input, Hidden'], Float], 
+            Wh : NDArray[Shape['Hidden, Hidden'], Float], 
+            b : NDArray[Shape['Hidden'], Float], 
+            stateful : bool = False) -> None:
         self.params : List[NDArray] = [Wx, Wh, b]
         self.grads : List[NDArray] = [np.zeros_like(Wx), np.zeros_like(Wh), np.zeros_like(b)]
         self.layers : Optional[List[RNN]] = None
 
-        self.h : Optional[NDArray[Shape['*, *'], Float]] = None 
-        self.dh : Optional[NDArray[Shape['*, *'], Float]] = None
+        self.h : Optional[NDArray[Shape['Batch, Hidden'], Float]] = None  # ブロック間での h の引き継ぎ
+        self.dh : Optional[NDArray[Shape['Batch, Hidden'], Float]] = None
         self.stateful : bool = stateful
 
-    def forward(self, xs : NDArray[Shape['*, *, *'], Float]) -> NDArray[Shape['*, *, *'], Float]:
+    def forward(
+            self, 
+            xs : NDArray[Shape['Batch, TimeRange, Input'], Float]) -> NDArray[Shape['Batch, TimeRange, Hidden'], Float]:
         """forward関数
 
         Parameters
@@ -66,29 +82,31 @@ class TimeRNN(Layer):
         D, H = Wx.shape
 
         self.layers = []
-        hs : NDArray[Shape['*, *, *'], Float] = np.empty((N, T, H), dtype='f')
+        hs : NDArray[Shape['Batch, TimeRange, Hidden'], Float] = np.empty((N, T, H), dtype='f')
 
         if not self.stateful or self.h is None:
             self.h = np.zeros((N, H), dtype='f')
 
         for t in range(T):
             layer : RNN = RNN(*self.params)
-            self.h = layer.forward(x=xs[:, t, :], h_prev=self.h)
+            self.h = layer.forward(x=xs[:, t, :], h_prev=self.h)  # 最後の h を保持する
             hs[:, t, :] = self.h
             self.layers.append(layer)
 
         return hs
 
-    def backward(self, dhs: NDArray[Shape['*, *, *'], Float]) -> NDArray[Shape['*, *, *'], Float]:
+    def backward(
+            self, 
+            dhs: NDArray[Shape['Batch, TimeRange, Hidden'], Float]) -> NDArray[Shape['Batch, TimeRange, Input'], Float]:
         Wx, Wh, b = self.params
         N, T, H = dhs.shape
         D, H = Wx.shape
 
-        dxs : NDArray[Shape['*, *, *'], Float] = np.empty((N, T, D), dtype='f')
-        dh : NDArray[Shape['*, *'], Float] = 0
+        dxs : NDArray[Shape['Batch, TimeRange, Input'], Float] = np.empty((N, T, D), dtype='f')
+        dh : NDArray[Shape['Batch, Hidden'], Float] = 0
         grads : List[NDArray] = [0, 0, 0]
         for t in reversed(range(T)):
-            layer = self.layers[t]
+            layer : RNN = self.layers[t]
             dx, dh = layer.backward(dh_next=dhs[:, t, :] + dh)
             dxs[:, t, :] = dx
 
@@ -240,22 +258,26 @@ class TimeLSTM:
         self.h, self.c = None, None
 
 
-class TimeEmbedding:
-    def __init__(self, W):
-        self.params = [W]
-        self.grads = [np.zeros_like(W)]
-        self.layers = None
-        self.W = W
+class TimeEmbedding(Layer):
+    def __init__(
+            self, 
+            W: NDArray[Shape['Vocab, Output'], Float]) -> None:
+        self.params : List[NDArray] = [W]
+        self.grads : List[NDArray] = [np.zeros_like(W)]
+        self.layers : Optional[Embedding] = None
+        self.W : NDArray[Shape['Vocab, Output'], Float] = W
 
-    def forward(self, xs):
+    def forward(
+            self, 
+            xs: NDArray[Shape['Batch, TimeRange'], Float]) -> NDArray[Shape['Batch, TimeRange, Output'], Float]:
         N, T = xs.shape
         V, D = self.W.shape
 
-        out = np.empty((N, T, D), dtype='f')
+        out : NDArray[Shape['Batch, TimeRange, Output'], Float] = np.empty((N, T, D), dtype='f')
         self.layers = []
 
         for t in range(T):
-            layer = Embedding(self.W)
+            layer : Embedding = Embedding(self.W)
             out[:, t, :] = layer.forward(xs[:, t])
             self.layers.append(layer)
 
@@ -274,33 +296,40 @@ class TimeEmbedding:
         return None
 
 
-class TimeAffine:
-    def __init__(self, W, b):
-        self.params = [W, b]
-        self.grads = [np.zeros_like(W), np.zeros_like(b)]
-        self.x = None
+class TimeAffine(Layer):
+    def __init__(
+            self, 
+            W: NDArray[Shape['Input, Output'], Float], 
+            b: NDArray[Shape['Output'], Float]) -> None:
+        self.params : List[NDArray] = [W, b]
+        self.grads : List[NDArray] = [np.zeros_like(W), np.zeros_like(b)]
+        self.x : Optional[NDArray[Shape['Batch, TimeRange, Input']]] = None
 
-    def forward(self, x):
+    def forward(
+            self, 
+            x: NDArray[Shape['Batch, TimeRange, Input'], Float]) -> NDArray[Shape['Batch, TimeRange, Output'], Float]:
         N, T, D = x.shape
         W, b = self.params
 
-        rx = x.reshape(N*T, -1)
-        out = np.dot(rx, W) + b
+        rx : NDArray[Shape['Batch_x_TimeRange, Input'], Float] = x.reshape(N*T, -1)
+        out : NDArray[Shape['Batch_x_TimeRange, Output'], Float] = rx @ W + b
         self.x = x
         return out.reshape(N, T, -1)
 
-    def backward(self, dout):
-        x = self.x
+    def backward(
+            self, 
+            dout: NDArray[Shape['Batch, TimeRange, Output'], Float]) -> NDArray[Shape['Batch, TimeRange, Input'], Float]:
+        x : NDArray[Shape['Batch, TimeRange, Input'], Float] = self.x
         N, T, D = x.shape
         W, b = self.params
 
-        dout = dout.reshape(N*T, -1)
-        rx = x.reshape(N*T, -1)
+        dout : NDArray[Shape['Batch_x_TimeRange, Output'], Float] = dout.reshape(N*T, -1)
+        rx : NDArray[Shape['Batch_x_TimeRange, Input'], Float] = x.reshape(N*T, -1)
 
-        db = np.sum(dout, axis=0)
-        dW = np.dot(rx.T, dout)
-        dx = np.dot(dout, W.T)
-        dx = dx.reshape(*x.shape)
+        db : NDArray[Shape['Output'], Float] = np.sum(dout, axis=0)
+        dW : NDArray[Shape['Input, Output'], Float] = rx.T @ dout
+        dx : NDArray[Shape['Batch_x_TimeRange, Input'], Float] = dout @ W.T
+        dx : NDArray[Shape['Batch, TimeRange, Input'], Float] = dx.reshape(*x.shape)
 
         self.grads[0][...] = dW
         self.grads[1][...] = db
@@ -642,7 +671,3 @@ class Simple_TimeAffine:
             self.db += layer.db
 
         return dxs
-
-
-
-

@@ -1,12 +1,15 @@
-# coding: utf-8
-import sys
-sys.path.append('..')
-import matplotlib.pyplot as plt
 import numpy as np
-from common.optimizer import SGD
-from dataset import ptb
+from nptyping import NDArray, Shape, Int, Float
+import matplotlib.pyplot as plt
+import seaborn as sns
+from tqdm import tqdm
+from rich import print
+from dl_scratch2.common.optimizer import SGD
+from dl_scratch2.dataset import ptb
+
 from simple_rnnlm import SimpleRnnlm
 
+sns.set_style('whitegrid')
 
 # ハイパーパラメータの設定
 batch_size = 10
@@ -42,7 +45,7 @@ optimizer = SGD(lr)
 jump = (corpus_size - 1) // batch_size
 offsets = [i * jump for i in range(batch_size)]
 
-for epoch in range(max_epoch):
+for epoch in tqdm(range(max_epoch)):
     for iter in range(max_iters):
         # ミニバッチの取得
         batch_x = np.empty((batch_size, time_size), dtype='i')
@@ -62,10 +65,11 @@ for epoch in range(max_epoch):
 
     # エポックごとにパープレキシティの評価
     ppl = np.exp(total_loss / loss_count)
-    print('| epoch %d | perplexity %.2f'
-          % (epoch+1, ppl))
+    # print('| epoch %d | perplexity %.2f'% (epoch+1, ppl))
     ppl_list.append(float(ppl))
     total_loss, loss_count = 0, 0
+
+print(f'perplexity: {ppl_list[-1]:.2f}')
 
 # グラフの描画
 x = np.arange(len(ppl_list))

@@ -163,18 +163,18 @@ class Dropout(Layer):
 
 
 class Embedding(Layer):
-    def __init__(self, W: NDArray):
+    def __init__(self, W: NDArray[Shape['Vocab, Output'], Float]):
         self.params : List[NDArray] = [W]
         self.grads : List[NDArray] = [np.zeros_like(W)]
         self.idx : Optional[List[int]] = None
 
-    def forward(self, idx: List[int]) -> NDArray:
+    def forward(self, idx: NDArray[Shape['Batch'], Int]) -> NDArray[Shape['Batch, Output'], Float]:
         W, = self.params
         self.idx = idx
-        out : NDArray = W[idx]
+        out : NDArray[Shape['Batch, Output'], Float] = W[idx]
         return out
 
-    def backward(self, dout: NDArray):
+    def backward(self, dout: NDArray[Shape['Batch, Output'], Float]) -> None:
         dW, = self.grads
         dW[...] = 0
         if GPU:

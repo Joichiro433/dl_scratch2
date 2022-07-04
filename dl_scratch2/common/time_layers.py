@@ -1,3 +1,4 @@
+from re import L
 from typing import List, Dict, Tuple, Optional
 
 from nptyping import NDArray, Shape, Int, Float
@@ -485,76 +486,87 @@ class TimeSigmoidWithLoss:
         return dxs
 
 
-class GRU:
-    def __init__(self, Wx, Wh, b):
-        '''
+class GRU(Layer):
+    def __init__(
+            self, 
+            Wx: NDArray[Shape['Input, Hidden_x_3'], Float], 
+            Wh: NDArray[Shape['Hidden, Hidden_x_3'], Float], 
+            b: NDArray[Shape['Hidden_x_3'], Float]) -> None:
+        """
 
         Parameters
         ----------
         Wx: 入力`x`用の重みパラーメタ（3つ分の重みをまとめる）
         Wh: 隠れ状態`h`用の重みパラメータ（3つ分の重みをまとめる）
         b: バイアス（3つ分のバイアスをまとめる）
-        '''
-        self.params = [Wx, Wh, b]
-        self.grads = [np.zeros_like(Wx), np.zeros_like(Wh), np.zeros_like(b)]
-        self.cache = None
+        """
+        self.params : List[NDArray] = [Wx, Wh, b]
+        self.grads : List[NDArray] = [np.zeros_like(Wx), np.zeros_like(Wh), np.zeros_like(b)]
+        self.cache : Optional[Tuple[NDArray, ...]] = None
 
-    def forward(self, x, h_prev):
+    def forward(
+            self, 
+            x: NDArray[Shape['Batch, Input'], Float], 
+            h_prev: NDArray[Shape['Batch, Hidden'], Float]
+        ) -> NDArray[Shape['Batch, Hidden'], Float]:
         Wx, Wh, b = self.params
-        H = Wh.shape[0]
+        H : int = Wh.shape[0]
         Wxz, Wxr, Wxh = Wx[:, :H], Wx[:, H:2 * H], Wx[:, 2 * H:]
         Whz, Whr, Whh = Wh[:, :H], Wh[:, H:2 * H], Wh[:, 2 * H:]
         bz, br, bh = b[:H], b[H:2 * H], b[2 * H:]
 
-        z = sigmoid(np.dot(x, Wxz) + np.dot(h_prev, Whz) + bz)
-        r = sigmoid(np.dot(x, Wxr) + np.dot(h_prev, Whr) + br)
-        h_hat = np.tanh(np.dot(x, Wxh) + np.dot(r*h_prev, Whh) + bh)
-        h_next = (1-z) * h_prev + z * h_hat
+        z : NDArray[Shape['Batch, Hidden'], Float] = sigmoid((x @ Wxz) + (h_prev @ Whz) + bz)
+        r : NDArray[Shape['Batch, Hidden'], Float] = sigmoid((x @ Wxr) + (h_prev @ Whr) + br)
+        h_hat : NDArray[Shape['Batch, Hidden'], Float] = np.tanh((x @ Wxh) + (r*h_prev @ Whh) + bh)
+        h_next : NDArray[Shape['Batch, Hidden'], Float] = (1-z) * h_prev + z * h_hat
 
         self.cache = (x, h_prev, z, r, h_hat)
 
         return h_next
 
-    def backward(self, dh_next):
+    def backward(
+            self, 
+            dh_next: NDArray[Shape['Batch, Hidden'], Float]
+        ) -> Tuple[NDArray[Shape['Batch, Input'], Float], NDArray[Shape['Batch, Hidden'], Float]]:
         Wx, Wh, b = self.params
-        H = Wh.shape[0]
+        H : int = Wh.shape[0]
         Wxz, Wxr, Wxh = Wx[:, :H], Wx[:, H:2 * H], Wx[:, 2 * H:]
         Whz, Whr, Whh = Wh[:, :H], Wh[:, H:2 * H], Wh[:, 2 * H:]
         x, h_prev, z, r, h_hat = self.cache
 
-        dh_hat =dh_next * z
-        dh_prev = dh_next * (1-z)
+        dh_hat : NDArray[Shape['Batch, Hidden'], Float] = dh_next * z
+        dh_prev : NDArray[Shape['Batch, Hidden'], Float] = dh_next * (1-z)
 
         # tanh
-        dt = dh_hat * (1 - h_hat ** 2)
-        dbh = np.sum(dt, axis=0)
-        dWhh = np.dot((r * h_prev).T, dt)
-        dhr = np.dot(dt, Whh.T)
-        dWxh = np.dot(x.T, dt)
-        dx = np.dot(dt, Wxh.T)
+        dt : NDArray[Shape['Batch, Hidden'], Float] = dh_hat * (1 - h_hat ** 2)
+        dbh : NDArray[Shape['Hidden'], Float] = np.sum(dt, axis=0)
+        dWhh : NDArray[Shape['Hidden, Hidden'], Float] = (r * h_prev).T @ dt
+        dhr : NDArray[Shape['Batch, Hidden'], Float] = dt @ Whh.T
+        dWxh : NDArray[Shape['Input, Hidden'], Float] = x.T @ dt
+        dx : NDArray[Shape['Batch, Input'], Float] = dt @ Wxh.T
         dh_prev += r * dhr
 
         # update gate(z)
-        dz = dh_next * h_hat - dh_next * h_prev
-        dt = dz * z * (1-z)
-        dbz = np.sum(dt, axis=0)
-        dWhz = np.dot(h_prev.T, dt)
-        dh_prev += np.dot(dt, Whz.T)
-        dWxz = np.dot(x.T, dt)
-        dx += np.dot(dt, Wxz.T)
+        dz : NDArray[Shape['Batch, Hidden'], Float] = dh_next * h_hat - dh_next * h_prev
+        dt : NDArray[Shape['Batch, Hidden'], Float] = dz * z * (1-z)
+        dbz : NDArray[Shape['Hidden'], Float] = np.sum(dt, axis=0)
+        dWhz : NDArray[Shape['Hidden, Hidden'], Float] = h_prev.T @ dt
+        dh_prev += dt @ Whz.T
+        dWxz : NDArray[Shape['Input, Hidden'], Float] = x.T @ dt
+        dx += dt @ Wxz.T
 
         # rest gate(r)
-        dr = dhr * h_prev
-        dt = dr * r * (1-r)
-        dbr = np.sum(dt, axis=0)
-        dWhr = np.dot(h_prev.T, dt)
-        dh_prev += np.dot(dt, Whr.T)
-        dWxr = np.dot(x.T, dt)
-        dx += np.dot(dt, Wxr.T)
+        dr : NDArray[Shape['Batch, Hidden'], Float] = dhr * h_prev
+        dt : NDArray[Shape['Batch, Hidden'], Float] = dr * r * (1-r)
+        dbr : NDArray[Shape['Hidden'], Float] = np.sum(dt, axis=0)
+        dWhr : NDArray[Shape['Hidden, Hidden'], Float] = h_prev.T @ dt
+        dh_prev += dt @ Whr.T
+        dWxr : NDArray[Shape['Input, Hidden'], Float] = x.T @ dt
+        dx += dt @ Wxr.T
 
-        self.dWx = np.hstack((dWxz, dWxr, dWxh))
-        self.dWh = np.hstack((dWhz, dWhr, dWhh))
-        self.db = np.hstack((dbz, dbr, dbh))
+        self.dWx : NDArray[Shape['Input, Hidden_x_3'], Float] = np.hstack((dWxz, dWxr, dWxh))
+        self.dWh : NDArray[Shape['Hidden, Hidden_x_3'], Float] = np.hstack((dWhz, dWhr, dWhh))
+        self.db : NDArray[Shape['Hidden_x_3'], Float] = np.hstack((dbz, dbr, dbh))
 
         self.grads[0][...] = self.dWx
         self.grads[1][...] = self.dWh

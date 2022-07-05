@@ -1,8 +1,5 @@
-# coding: utf-8
-import sys
-sys.path.append('..')
-from common.time_layers import *
-from common.base_model import BaseModel
+from dl_scratch2.common.time_layers import *
+from dl_scratch2.common.base_model import BaseModel
 
 
 class Rnnlm(BaseModel):

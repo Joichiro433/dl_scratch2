@@ -1,14 +1,16 @@
-# coding: utf-8
-import sys
-sys.path.append('..')
 import numpy as np
 import matplotlib.pyplot as plt
-from dataset import sequence
-from common.optimizer import Adam
-from common.trainer import Trainer
-from common.util import eval_seq2seq
+import seaborn as sns
+from rich import print
+
+from dl_scratch2.dataset import sequence
+from dl_scratch2.common.optimizer import Adam
+from dl_scratch2.common.trainer import Trainer
+from dl_scratch2.common.util import eval_seq2seq
 from seq2seq import Seq2seq
 from peeky_seq2seq import PeekySeq2seq
+
+sns.set_style('whitegrid')
 
 
 # データセットの読み込み
@@ -16,7 +18,7 @@ from peeky_seq2seq import PeekySeq2seq
 char_to_id, id_to_char = sequence.get_vocab()
 
 # Reverse input? =================================================
-is_reverse = False  # True
+is_reverse = True  # True
 if is_reverse:
     x_train, x_test = x_train[:, ::-1], x_test[:, ::-1]
 # ================================================================
@@ -30,8 +32,8 @@ max_epoch = 25
 max_grad = 5.0
 
 # Normal or Peeky? ==============================================
-model = Seq2seq(vocab_size, wordvec_size, hidden_size)
-# model = PeekySeq2seq(vocab_size, wordvec_size, hidden_size)
+# model = Seq2seq(vocab_size, wordvec_size, hidden_size)
+model = PeekySeq2seq(vocab_size, wordvec_size, hidden_size)
 # ================================================================
 optimizer = Adam()
 trainer = Trainer(model, optimizer)

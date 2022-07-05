@@ -1,10 +1,8 @@
-# coding: utf-8
-import sys
-sys.path.append('..')
 import numpy as np
-from common.functions import softmax
-from ch06.rnnlm import Rnnlm
-from ch06.better_rnnlm import BetterRnnlm
+from nptyping import NDArray, Shape, Int, Float
+from dl_scratch2.common.functions import softmax
+from dl_scratch2.ch06.rnnlm import Rnnlm
+from dl_scratch2.ch06.better_rnnlm import BetterRnnlm
 
 
 class RnnlmGen(Rnnlm):

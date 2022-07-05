@@ -413,7 +413,7 @@ class TimeDropout:
         return dout * self.mask
 
 
-class TimeBiLSTM:
+class TimeBiLSTM(Layer):
     def __init__(self, Wx1, Wh1, b1,
                  Wx2, Wh2, b2, stateful=False):
         self.forward_lstm = TimeLSTM(Wx1, Wh1, b1, stateful)

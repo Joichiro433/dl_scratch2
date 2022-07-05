@@ -1,10 +1,7 @@
-# coding: utf-8
-import sys
-sys.path.append('..')
 import os
 import pickle
-from common.np import *
-from common.util import to_gpu, to_cpu
+from dl_scratch2.common.np import *
+from dl_scratch2.common.util import to_gpu, to_cpu
 
 
 class BaseModel:

@@ -1,7 +1,4 @@
-# coding: utf-8
-import sys
-sys.path.append('..')
-from dataset import sequence
+from dl_scratch2.dataset import sequence
 
 
 (x_train, t_train), (x_test, t_test) = \

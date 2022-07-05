@@ -1,8 +1,7 @@
-# coding: utf-8
-import sys
-sys.path.append('..')
+from rich import print
+
 from rnnlm_gen import RnnlmGen
-from dataset import ptb
+from dl_scratch2.dataset import ptb
 
 
 corpus, word_to_id, id_to_word = ptb.load_data('train')
